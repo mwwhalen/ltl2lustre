@@ -42,6 +42,8 @@ public class LTL2Lustre {
 			int count = 0; 
 			for (Ltl_specContext ltlSpec: program.ltl_spec()) {
 				try {
+					System.out.println("Translating property #: " + count + 
+							" [" + propertyName(ltlSpec) + "] "); 
 					SafetyCheckVisitor scv = new SafetyCheckVisitor(settings.allowGUnderNegation);
 					boolean isSafety = ltlSpec.accept(scv);
 					if (!isSafety) {
@@ -54,14 +56,13 @@ public class LTL2Lustre {
 					GenerateLustreVisitor glv = new GenerateLustreVisitor(maxDepth);
 					Expr lustreExpr = ltlSpec.accept(glv);
 					
-					System.out.println("For property #: " + count + 
-								" [" + propertyName(ltlSpec) + "], Lustre translation is: ");
 					System.out.println(lustreExpr.toString());
 
 				} catch(Exception e) {
 					StdErr.error("Error translating property #: " + count + 
 								" [" + propertyName(ltlSpec) + "]" + e.toString());
 				}
+				count++;
 			}
 		} catch (Throwable t) {
 			t.printStackTrace();

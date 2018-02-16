@@ -53,19 +53,27 @@ public class GenerateLustreVisitor extends ltlBaseVisitor<Expr> {
 	
 	
 	@Override public Expr visitProgram(@NotNull ltlParser.ProgramContext ctx) { 
-		Expr result = visitChildren(ctx);
-		Expr stepCtr = new BinaryExpr(new IdExpr("initial_step_counter"), BinaryOp.GREATEREQUAL, new IntExpr(maxNextDepth));
-		return new BinaryExpr(stepCtr, BinaryOp.IMPLIES, result);
+		throw new IllegalArgumentException("Error: Generate Lustre Visitor should not be called on program nodes");
 	}
 
+	private Expr generateOptionalStepCounter(Expr base) {
+		if (maxNextDepth > 0) {
+			Expr stepCtr = new BinaryExpr(new IdExpr("initial_step_counter"), BinaryOp.GREATEREQUAL, new IntExpr(maxNextDepth));
+			return new BinaryExpr(stepCtr, BinaryOp.IMPLIES, base);
+		}
+		else {
+			return base;
+		}
+	}
+	
 	@Override public Expr visitAnonymousLtlExpr(@NotNull ltlParser.AnonymousLtlExprContext ctx) { 
 		Expr result = ctx.expr.accept(this);
-		return result;
+		return generateOptionalStepCounter(result);
 	}
 		
 	@Override public Expr visitNamedLtlExpr(@NotNull ltlParser.NamedLtlExprContext ctx) { 
 		Expr result = ctx.expr.accept(this);
-		return result;
+		return generateOptionalStepCounter(result);
 	}
 
 	@Override public Expr visitNestedLtlExpr(@NotNull ltlParser.NestedLtlExprContext ctx) { 

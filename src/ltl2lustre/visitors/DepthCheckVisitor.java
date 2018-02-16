@@ -16,14 +16,14 @@ public class DepthCheckVisitor extends ltlBaseVisitor<Integer> {
 		} else if (nextResult != null) {
 			return nextResult;
 		} else {
-			return 0;
+			return null;
 		}
 	}
 
 	private int visitUnyOp(String op, int result) {
 		if (op.equalsIgnoreCase("X") ||
 			op.equalsIgnoreCase("next")) {
-			return result++; 
+			return result+1; 
 		} else {
 			return result;
 		}		
@@ -32,14 +32,17 @@ public class DepthCheckVisitor extends ltlBaseVisitor<Integer> {
 	@Override public Integer visitConstant(@NotNull ltlParser.ConstantContext ctx) { return 0; }
 
 	@Override public Integer visitUnyExpr(@NotNull ltlParser.UnyExprContext ctx) { 
-		return visitUnyOp(ctx.op.getText(), visitChildren(ctx)); 
+		int result = visitUnyOp(ctx.op.getText(), visitChildren(ctx));
+		return result;
 	}
 
 	@Override public Integer visitUnyLtlExpr(@NotNull ltlParser.UnyLtlExprContext ctx) { 
-		return visitUnyOp(ctx.op.getText(), visitChildren(ctx));
+		Integer childResult = visitChildren(ctx); 
+		int result = visitUnyOp(ctx.op.getText(), childResult);
+		return result;
 	}
 
 	@Override public Integer visitConstantExpr(@NotNull ltlParser.ConstantExprContext ctx) { return 0; }
 	@Override public Integer visitIdExpr(@NotNull ltlParser.IdExprContext ctx) { return 0; }
-	
+
 }
