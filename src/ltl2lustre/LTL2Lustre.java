@@ -1,6 +1,8 @@
 package ltl2lustre;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -34,43 +36,87 @@ public class LTL2Lustre {
 		}
 	}
 
-	public static void main(String[] args) {
+	private LTL2LustreSettings settings;
+	int count = 0; 
+	
+	public LTL2Lustre(LTL2LustreSettings settings) {
+		this.settings = settings;
+	}
+	
+	
+	public Expr translateProperty(Ltl_specContext ltlSpec) throws Exception {
+		System.out.println("Translating property #: " + count++ + 
+				" [" + propertyName(ltlSpec) + "] "); 
+		SafetyCheckVisitor scv = new SafetyCheckVisitor(settings.allowGUnderNegation);
+		boolean isSafety = ltlSpec.accept(scv);
+		if (!isSafety) {
+			throw new Exception("property is not a safety property.");
+		}
+		
+		DepthCheckVisitor dcv = new DepthCheckVisitor();
+		int maxDepth = ltlSpec.accept(dcv);
+		
+		GenerateLustreVisitor glv = new GenerateLustreVisitor(maxDepth);
+		Expr lustreExpr = ltlSpec.accept(glv);
+		return lustreExpr;
+		
+	}
+	
+	
+	public void writeInitialStepCounter(BufferedWriter writer) throws Exception {
+		writer.write("// definition of initial step counter (necessary for properties with history)");
+		writer.write(System.lineSeparator());
+		writer.write("initial_step_counter = 0 -> pre(initial_step_counter) + 1;");
+		writer.write(System.lineSeparator());
+		writer.write(System.lineSeparator());
+	}
+	
+	public void execute() throws Exception {
+		ProgramContext program = parseLtl(settings.filename);
+		BufferedWriter writer = null;
 		try {
-			LTL2LustreSettings settings = LTL2LustreArgumentParser.parse(args);
-			ProgramContext program = parseLtl(settings.filename);
+			writer = new BufferedWriter(new FileWriter(settings.filename + ".lustre"));
+			writeInitialStepCounter(writer);
 			
 			int count = 0; 
 			for (Ltl_specContext ltlSpec: program.ltl_spec()) {
 				try {
-					System.out.println("Translating property #: " + count + 
-							" [" + propertyName(ltlSpec) + "] "); 
-					SafetyCheckVisitor scv = new SafetyCheckVisitor(settings.allowGUnderNegation);
-					boolean isSafety = ltlSpec.accept(scv);
-					if (!isSafety) {
-						throw new Exception("property is not a safety property.");
+					Expr lustreExpr = translateProperty(ltlSpec);
+					
+					if (!settings.quiet ) {
+						System.out.println(lustreExpr.toString());
 					}
-					
-					DepthCheckVisitor dcv = new DepthCheckVisitor();
-					int maxDepth = ltlSpec.accept(dcv);
-					
-					GenerateLustreVisitor glv = new GenerateLustreVisitor(maxDepth);
-					Expr lustreExpr = ltlSpec.accept(glv);
-					
-					System.out.println(lustreExpr.toString());
-
+					if (writer != null) {
+						writer.write("// Property " + count + " [" + propertyName(ltlSpec) + "]");
+						writer.write(System.lineSeparator());
+						writer.write(lustreExpr.toString());
+						writer.write(System.lineSeparator());
+						writer.write(System.lineSeparator());
+						writer.flush();
+					}
 				} catch(Exception e) {
 					StdErr.error("Error translating property #: " + count + 
 								" [" + propertyName(ltlSpec) + "]" + e.toString());
 				}
 				count++;
 			}
+		} finally {
+			if (writer != null) writer.close();
+		}
+	}
+	
+	public static void main(String[] args) {
+		try {
+			LTL2LustreSettings settings = LTL2LustreArgumentParser.parse(args);
+			LTL2Lustre ltl2lustre = new LTL2Lustre(settings);
+			ltl2lustre.execute(); 
 		} catch (Throwable t) {
 			t.printStackTrace();
 			System.exit(ExitCodes.UNCAUGHT_EXCEPTION);
 		}
 	}
 
-	public static ProgramContext parseLtl(String filename) throws Exception {
+	public ProgramContext parseLtl(String filename) throws Exception {
 		File file = new File(filename);
 		if (!file.exists() || !file.isFile()) {
 			StdErr.fatal(ExitCodes.FILE_NOT_FOUND, "cannot find file " + filename);
@@ -83,7 +129,7 @@ public class LTL2Lustre {
 		return parseLtl(new ANTLRFileStream(filename));
 	}
 
-	private static List<String> readAllLines(String filename) {
+	private List<String> readAllLines(String filename) {
 		Path path = FileSystems.getDefault().getPath(filename);
 		try {
 			return Files.readAllLines(path);
@@ -92,7 +138,7 @@ public class LTL2Lustre {
 		}
 	}
 
-	public static ProgramContext parseLtl(CharStream stream) throws Exception {
+	public ProgramContext parseLtl(CharStream stream) throws Exception {
 		ltlLexer lexer = new ltlLexer(stream);
 		CommonTokenStream tokens = new CommonTokenStream(lexer);
 		ltlParser parser = new ltlParser(tokens);
